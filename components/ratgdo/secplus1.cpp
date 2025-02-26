@@ -43,6 +43,9 @@ namespace ratgdo {
         void Secplus1::dump_config()
         {
             ESP_LOGCONFIG(TAG, "  Protocol: SEC+ v1");
+#ifdef DISABLE_EMULATION
+            ESP_LOGCONFIG(TAG, "   - EMULATION DISABLED!");
+#endif
         }
 
         void Secplus1::sync()
@@ -52,8 +55,10 @@ namespace ratgdo {
             this->door_state = DoorState::UNKNOWN;
             this->light_state = LightState::UNKNOWN;
             this->scheduler_->cancel_timeout(this->ratgdo_, "wall_panel_emulation");
+#ifndef DISABLE_EMULATION
+            ESP_LOGCONFIG(TAG, "*** EMULATION ENABLED!");
             this->wall_panel_emulation();
-
+#endif
             this->scheduler_->set_timeout(this->ratgdo_, "", 45000, [=] {
                 if (this->door_state == DoorState::UNKNOWN) {
                     ESP_LOGW(TAG, "Triggering sync failed actions.");
@@ -64,15 +69,17 @@ namespace ratgdo {
 
         void Secplus1::wall_panel_emulation(size_t index)
         {
-            if (this->wall_panel_emulation_state_ == WallPanelEmulationState::WAITING) {
-                ESP_LOG1(TAG, "Looking for security+ 1.0 wall panel...");
+            if (this->wall_panel_starting_) {
+                this->wall_panel_emulation_state_ = WallPanelEmulationState::WAITING;
+            } else if (this->wall_panel_emulation_state_ == WallPanelEmulationState::WAITING) {
+                ESP_LOGD(TAG, "Looking for security+ 1.0 wall panel...");
 
                 if (this->door_state != DoorState::UNKNOWN || this->light_state != LightState::UNKNOWN) {
-                    ESP_LOG1(TAG, "Wall panel detected");
+                    ESP_LOGD(TAG, "Wall panel detected");
                     return;
                 }
                 if (millis() - this->wall_panel_emulation_start_ > 35000 && !this->wall_panel_starting_) {
-                    ESP_LOG1(TAG, "No wall panel detected. Switching to emulation mode.");
+                    ESP_LOGD(TAG, "No wall panel detected. Switching to emulation mode.");
                     this->wall_panel_emulation_state_ = WallPanelEmulationState::RUNNING;
                 }
                 this->scheduler_->set_timeout(this->ratgdo_, "wall_panel_emulation", 2000, [=] {
@@ -293,7 +300,10 @@ namespace ratgdo {
 
         void Secplus1::handle_command(const RxCommand& cmd)
         {
-            if (cmd.req == CommandType::QUERY_DOOR_STATUS) {
+            if (cmd.req == CommandType::TOGGLE_DOOR_RELEASE || cmd.resp == 0x31) {
+                ESP_LOGD(TAG, "wall panel is starting");
+                this->wall_panel_starting_ = true;
+            } else if (cmd.req == CommandType::QUERY_DOOR_STATUS) {
 
                 DoorState door_state;
                 auto val = cmd.resp & 0x7;
@@ -365,10 +375,6 @@ namespace ratgdo {
             } else if (cmd.req == CommandType::OBSTRUCTION) {
                 ObstructionState obstruction_state = cmd.resp == 0 ? ObstructionState::CLEAR : ObstructionState::OBSTRUCTED;
                 this->ratgdo_->received(obstruction_state);
-            } else if (cmd.req == CommandType::TOGGLE_DOOR_RELEASE) {
-                if (cmd.resp == 0x31) {
-                    this->wall_panel_starting_ = true;
-                }
             } else if (cmd.req == CommandType::TOGGLE_LIGHT_PRESS) {
                 // motion was detected, or the light toggle button was pressed
                 // either way it's ok to trigger motion detection

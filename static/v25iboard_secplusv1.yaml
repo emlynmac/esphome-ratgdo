@@ -29,10 +29,11 @@ dashboard_import:
   package_import_url: github://ratgdo/esphome-ratgdo/v25iboard_secplusv1.yaml@main
 
 packages:
-  remote_package:
-    url: https://github.com/ratgdo/esphome-ratgdo
-    files: [base_secplusv1.yaml]
-    refresh: 1s
+  esphome-ratgdo: !include base_secplusv1.yaml
+  # remote_package:
+  #   url: https://github.com/ratgdo/esphome-ratgdo
+  #   files: [base_secplusv1.yaml]
+  #   refresh: 1s
 
 # Sync time with Home Assistant.
 time:
@@ -43,6 +44,7 @@ api:
   id: api_server
 
 ota:
+  platform: esphome
 
 improv_serial:
 
