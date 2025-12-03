@@ -11,13 +11,14 @@ substitutions:
   discrete_close_pin: D8
 
 web_server:
+  local: true
 
 esphome:
   name: ${id_prefix}
   friendly_name: ${friendly_name}
   name_add_mac_suffix: true
   project:
-    name: ratgdo.esphome
+    name: ratgdo.v25iboard_drycontact
     version: "2.5i"
 
 esp8266:
@@ -47,6 +48,8 @@ improv_serial:
 
 wifi:
   ap:
+    ssid: "ratgdo"
+
+captive_portal:
 
 logger:
-  level: DEBUG
